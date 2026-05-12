@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "survey-dashboard",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-l", "3477", "."],
+      "port": 3477
+    }
+  ]
+}

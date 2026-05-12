@@ -1,0 +1,21 @@
+# Local dev-only Claude Code settings
+.claude/settings.local.json
+
+# macOS noise
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor noise
+.vscode/
+.idea/
+*.swp
+*~
+
+# Node / npx serve cache
+node_modules/
+npm-debug.log*
+yarn-error.log
+
+# Logs
+*.log
