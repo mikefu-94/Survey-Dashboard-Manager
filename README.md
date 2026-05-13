@@ -2,13 +2,13 @@
 
 A self-contained, single-file dashboard for browsing, launching, and managing EDB survey templates.
 
-The whole app is one HTML file (`survey-templates.html`) — no build step, no backend, no dependencies. Drop it on any static host, open it in a browser, done.
+The whole app is one HTML file (`index.html`) — no build step, no backend, no dependencies. Drop it on any static host, open it in a browser, done.
 
 ---
 
 ## What's in here
 
-- **`survey-templates.html`** — the dashboard itself. ~2,000 lines of inline HTML, CSS, and vanilla JS.
+- **`index.html`** — the dashboard itself. ~2,000 lines of inline HTML, CSS, and vanilla JS.
 - **`claude-design-deeplinks.user.js`** — optional Tampermonkey userscript that auto-triggers Claude Design actions (Download `.zip`, Handoff) when arriving via dashboard deep-links.
 - **`.claude/launch.json`** — local dev-server config (the `npx serve` command used during development).
 
@@ -20,7 +20,7 @@ The whole app is one HTML file (`survey-templates.html`) — no build step, no b
 npx serve -l 3477 .
 ```
 
-Then open <http://localhost:3477/survey-templates.html>.
+Then open <http://localhost:3477/>.
 
 That's it — no install step, no package manager, nothing to compile.
 

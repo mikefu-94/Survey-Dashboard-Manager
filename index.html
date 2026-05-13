@@ -924,6 +924,58 @@
       box-shadow: 0 0 0 3px rgba(34,197,94,0.18);
     }
 
+    /* Advanced disclosure inside the Mix modal */
+    .mix-advanced {
+      margin-top: -4px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+    }
+    .mix-advanced > summary {
+      padding: 10px 14px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--text-2);
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      user-select: none;
+    }
+    .mix-advanced > summary::-webkit-details-marker { display: none; }
+    .mix-advanced > summary::before {
+      content: "›";
+      display: inline-block;
+      transition: transform 0.15s;
+      color: var(--text-3);
+      font-size: 14px;
+      line-height: 1;
+    }
+    .mix-advanced[open] > summary::before { transform: rotate(90deg); }
+    .mix-advanced > summary:hover { color: var(--text-1); }
+    .mix-advanced-body {
+      padding: 4px 14px 14px;
+      border-top: 1px solid var(--border);
+    }
+    .mix-advanced-label {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      padding: 10px 0 6px;
+      font-size: 13px;
+      color: var(--text-1);
+      cursor: pointer;
+    }
+    .mix-advanced-label input[type="checkbox"] {
+      margin-top: 2px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
     /* Customization badges */
     .prompt-badges {
       display: flex;
@@ -1253,6 +1305,21 @@
           <textarea id="mixPrompt" class="mix-prompt" readonly></textarea>
         </div>
       </div>
+
+      <details class="mix-advanced">
+        <summary>Advanced — for Import JSON path</summary>
+        <div class="mix-advanced-body">
+          <label class="mix-advanced-label">
+            <input type="checkbox" id="mixEmitJson" />
+            <span>
+              Append JSON-output instructions to the prompt.
+              <span class="prompt-badges-hint" style="display:block;margin-top:4px;">
+                Tells Claude to emit a JSON block at the end of its response. Paste that block into <strong>↓ Import JSON</strong> on the toolbar to register the new template with all metadata (accent, audience, GitHub URL) pre-filled. Skip this if you'll register via Step 6 (URL paste) instead.
+              </span>
+            </span>
+          </label>
+        </div>
+      </details>
 
       <div class="mix-step">
         <p class="mix-step-label"><span class="mix-step-num">6</span> Once Claude has built it</p>
@@ -1875,6 +1942,7 @@
   const mixCopyFb   = document.getElementById("mixCopyFeedback");
   const mixRegisterUrl = document.getElementById("mixRegisterUrl");
   const mixRegisterBtn = document.getElementById("mixRegisterBtn");
+  const mixEmitJson    = document.getElementById("mixEmitJson");
 
   // Each axis lets the user pick which template to source that element from.
   const MIX_AXES = [
@@ -1975,21 +2043,23 @@
       badgeAdds.forEach(b => lines.push(`  • ${b.text}`));
     }
 
-    // Tail: ask Claude to emit a JSON block we can paste back into the dashboard
-    lines.push("");
-    lines.push("When you're done, output a single fenced JSON block in this exact shape so I can paste it back into my dashboard:");
-    lines.push("```json");
-    lines.push("{");
-    lines.push(`  "title": "${name || "…"}",`);
-    lines.push('  "description": "…",');
-    lines.push('  "audience": "external",');
-    lines.push('  "category": "Survey",');
-    lines.push('  "url": "<Claude Design URL of this project>",');
-    lines.push('  "githubUrl": "<optional GitHub repo URL>",');
-    lines.push('  "accent": "#22C55E",');
-    lines.push('  "thumbLabel": "v1.0"');
-    lines.push("}");
-    lines.push("```");
+    // Tail (optional): ask Claude to emit a JSON block for the Import JSON path
+    if (mixEmitJson && mixEmitJson.checked) {
+      lines.push("");
+      lines.push("When you're done, output a single fenced JSON block in this exact shape so I can paste it back into my dashboard:");
+      lines.push("```json");
+      lines.push("{");
+      lines.push(`  "title": "${name || "…"}",`);
+      lines.push('  "description": "…",');
+      lines.push('  "audience": "external",');
+      lines.push('  "category": "Survey",');
+      lines.push('  "url": "<Claude Design URL of this project>",');
+      lines.push('  "githubUrl": "<optional GitHub repo URL>",');
+      lines.push('  "accent": "#22C55E",');
+      lines.push('  "thumbLabel": "v1.0"');
+      lines.push("}");
+      lines.push("```");
+    }
 
     mixPromptEl.value = lines.join("\n");
 
@@ -2091,6 +2161,7 @@
   mixBase.addEventListener("input", rebuildMixPrompt);
   mixPurpose.addEventListener("input", rebuildMixPrompt);
   mixAxes.addEventListener("change", rebuildMixPrompt);
+  mixEmitJson.addEventListener("change", rebuildMixPrompt);
 
   mixCopyBtn.addEventListener("click", async () => {
     try {
