@@ -642,6 +642,56 @@
     }
     .empty-sub { font-size: 13px; color: var(--text-2); }
 
+    /* ── Toast notifications (bottom-right) ── */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+      max-width: calc(100vw - 48px);
+    }
+    .toast {
+      min-width: 240px;
+      max-width: 360px;
+      padding: 11px 14px 11px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border-2);
+      border-left-width: 3px;
+      border-radius: 6px;
+      color: var(--text-1);
+      font-size: 13px;
+      line-height: 1.45;
+      box-shadow: 0 10px 28px rgba(0,0,0,0.55);
+      pointer-events: auto;
+      animation: toast-in 0.18s ease-out;
+    }
+    .toast--error   { border-left-color: #F87171; }
+    .toast--success { border-left-color: var(--accent); }
+    .toast--info    { border-left-color: var(--text-2); }
+    .toast-title {
+      font-weight: 600;
+      margin-bottom: 2px;
+      letter-spacing: -0.005em;
+    }
+    .toast-body {
+      color: var(--text-2);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .toast.is-fading {
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.2s, transform 0.2s;
+    }
+
     /* ── Modal (Edit metadata + Mix & Match) ── */
     .modal-backdrop {
       position: fixed;
@@ -1126,22 +1176,6 @@
     <button class="pill"        data-filter="external" aria-pressed="false">External</button>
   </div>
 
-  <div class="search-wrap">
-    <svg class="search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none"
-         stroke="currentColor" stroke-width="1.7" aria-hidden="true">
-      <circle cx="6.5" cy="6.5" r="4.5"/>
-      <path d="M10.5 10.5l3 3" stroke-linecap="round"/>
-    </svg>
-    <input
-      class="search-input"
-      type="search"
-      placeholder="Search templates…"
-      aria-label="Search survey templates"
-      id="searchInput"
-      autocomplete="off"
-    />
-  </div>
-
   <div class="view-toggle" role="group" aria-label="View mode">
     <button class="view-btn" id="btnTile" aria-pressed="false" title="Tile view">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
@@ -1158,6 +1192,22 @@
         <rect x="0" y="10.5" width="14" height="2.5" rx="1"/>
       </svg>
     </button>
+  </div>
+
+  <div class="search-wrap">
+    <svg class="search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none"
+         stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+      <circle cx="6.5" cy="6.5" r="4.5"/>
+      <path d="M10.5 10.5l3 3" stroke-linecap="round"/>
+    </svg>
+    <input
+      class="search-input"
+      type="search"
+      placeholder="Search templates…"
+      aria-label="Search survey templates"
+      id="searchInput"
+      autocomplete="off"
+    />
   </div>
 </div>
 
@@ -1228,6 +1278,7 @@
             <input id="editThumbLabel" name="thumbLabel" type="text" maxlength="20" />
           </div>
         </div>
+        <p id="editError" style="color:#F87171; font-size:12px; margin-top:4px; display:none; font-family:var(--font-mono);"></p>
       </form>
     </div>
     <div class="modal-footer">
@@ -1324,6 +1375,7 @@
         <p class="mix-step-label"><span class="mix-step-num">1</span> Template name</p>
         <input id="mixBase" type="text" placeholder="e.g., Q3 Partner NPS Survey"
                style="width:100%;padding:9px 12px;font-size:13px;color:var(--text-1);background:var(--bg);border:1px solid var(--border);border-radius:5px;font-family:'Inter',sans-serif;outline:none;" />
+        <p id="mixError" style="color:#F87171; font-size:12px; margin-top:8px; display:none; font-family:var(--font-mono);"></p>
       </div>
 
       <div class="mix-step">
@@ -1533,10 +1585,16 @@
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length >= 0) return parsed;
       }
     } catch (e) {
       console.warn("Failed to read templates from localStorage:", e);
+      // We can't show a toast yet — document may not be ready.
+      // Defer it so it appears after first paint.
+      setTimeout(() => toast("Couldn't load saved templates", {
+        type: "error",
+        body: "Stored data was unreadable; reverted to defaults. Open DevTools console for details.",
+      }), 100);
     }
     return JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));
   }
@@ -1545,10 +1603,47 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
     } catch (e) {
       console.warn("Failed to write templates to localStorage:", e);
+      const quota = e && (e.name === "QuotaExceededError" || /quota/i.test(e.message || ""));
+      toast(quota ? "Storage full" : "Couldn't save templates", {
+        type: "error",
+        body: quota
+          ? "Browser storage is full. Delete some templates or clear old localStorage data."
+          : "Your change wasn't persisted. It'll be lost on reload.",
+      });
     }
   }
   function newId() {
     return "tpl-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
+  }
+
+  // ── Toast notifications ─────────────────────────────────────────
+  // Usage: toast("Saved ✓");
+  //        toast("Couldn't save", { type: "error", body: "Quota full" });
+  function toast(title, opts = {}) {
+    const { type = "success", body = "", duration = 3200 } = opts;
+    let container = document.getElementById("toastContainer");
+    if (!container) {
+      container = document.createElement("div");
+      container.id = "toastContainer";
+      container.className = "toast-container";
+      container.setAttribute("role", "status");
+      container.setAttribute("aria-live", "polite");
+      container.setAttribute("aria-atomic", "true");
+      document.body.appendChild(container);
+    }
+    const el = document.createElement("div");
+    el.className = `toast toast--${type}`;
+    el.innerHTML = body
+      ? `<div class="toast-title"></div><div class="toast-body"></div>`
+      : `<div class="toast-title"></div>`;
+    el.querySelector(".toast-title").textContent = title;
+    if (body) el.querySelector(".toast-body").textContent = body;
+    container.appendChild(el);
+    setTimeout(() => {
+      el.classList.add("is-fading");
+      setTimeout(() => el.remove(), 220);
+    }, duration);
+    return el;
   }
 
   // Create a new template card from a partial object. Fills sensible defaults
@@ -1719,9 +1814,9 @@
     const empty = document.createElement("div");
     empty.className = "empty"; empty.id = "emptyState"; empty.setAttribute("role", "status");
     empty.innerHTML = `
-      <p class="empty-eyebrow">&gt;_ no results</p>
-      <p class="empty-title">No templates found</p>
-      <p class="empty-sub">Try adjusting your search or filter.</p>`;
+      <p class="empty-eyebrow" id="emptyEyebrow"></p>
+      <p class="empty-title"   id="emptyTitle"></p>
+      <p class="empty-sub"     id="emptySub"></p>`;
     grid.appendChild(empty);
     applyFilter();
   }
@@ -1739,7 +1834,34 @@
     });
 
     const empty = document.getElementById("emptyState");
-    if (empty) empty.style.display = visible === 0 ? "block" : "none";
+    if (!empty) return;
+    const eyebrow = document.getElementById("emptyEyebrow");
+    const title   = document.getElementById("emptyTitle");
+    const sub     = document.getElementById("emptySub");
+
+    if (TEMPLATES.length === 0) {
+      // Truly empty dashboard — guide the user to add something
+      eyebrow.textContent = ">_ empty dashboard";
+      title.textContent   = "No templates yet";
+      sub.innerHTML       = 'Click <strong>+ New Template</strong>, <strong>↓ Import JSON</strong>, or <strong>Register Template</strong> to add one.';
+      empty.style.display = "block";
+    } else if (visible === 0) {
+      // Templates exist, but filter/search hides them all — be specific
+      eyebrow.textContent = ">_ no results";
+      if (q && activeFilter !== "all") {
+        title.textContent = `No ${activeFilter} templates match "${q}"`;
+        sub.textContent   = "Try a different search, switch filter to All, or clear the search.";
+      } else if (q) {
+        title.textContent = `No matches for "${q}"`;
+        sub.textContent   = "Try a different search term — or clear the search to see everything.";
+      } else {
+        title.textContent = `No ${activeFilter} templates`;
+        sub.textContent   = "Switch filter to All, or create a template for this audience.";
+      }
+      empty.style.display = "block";
+    } else {
+      empty.style.display = "none";
+    }
   }
 
   document.querySelectorAll(".pill").forEach(btn => {
@@ -1926,25 +2048,71 @@
     if (/^#[0-9a-fA-F]{6}$/.test(editAccent.value)) editAccentCol.value = editAccent.value;
   });
 
+  const editError = document.getElementById("editError");
+
+  function showEditError(msg, focusField) {
+    editError.textContent = msg;
+    editError.style.display = "block";
+    if (focusField) focusField.focus();
+  }
+
+  // Light URL sanity check — must be http(s) if non-empty
+  function looksLikeHttpUrl(u) {
+    if (!u) return false;
+    try {
+      const p = new URL(u);
+      return p.protocol === "http:" || p.protocol === "https:";
+    } catch { return false; }
+  }
+
   editForm.addEventListener("submit", (e) => {
     e.preventDefault();
+    editError.style.display = "none";
+
     const id  = editForm.elements.id.value;
     const idx = findIdx(id);
     if (idx < 0) { closeModal(editModal); return; }
+
+    const title       = editForm.elements.title.value.trim();
+    const url         = editForm.elements.url.value.trim();
+    const githubUrl   = editForm.elements.githubUrl.value.trim();
+    const accent      = editForm.elements.accent.value.trim();
+    const thumbLabel  = editForm.elements.thumbLabel.value.trim();
+
+    // ── Validation ──
+    if (!title) {
+      return showEditError("Title is required.", editForm.elements.title);
+    }
+    if (url && !looksLikeHttpUrl(url)) {
+      return showEditError("Claude Design URL must start with http:// or https://", editForm.elements.url);
+    }
+    if (githubUrl && !looksLikeHttpUrl(githubUrl)) {
+      return showEditError("GitHub URL must start with http:// or https://", editForm.elements.githubUrl);
+    }
+    if (accent && !/^#[0-9a-fA-F]{6}$/.test(accent)) {
+      return showEditError("Accent must be a 6-digit hex like #22C55E.", editForm.elements.accent);
+    }
+
+    // ── Apply ──
     const t = TEMPLATES[idx];
-    t.title       = editForm.elements.title.value.trim() || t.title;
+    t.title       = title;
     t.description = editForm.elements.description.value.trim();
     t.audience    = editForm.elements.audience.value;
     t.category    = editForm.elements.category.value.trim() || t.category;
-    t.url         = editForm.elements.url.value.trim() || "#";
-    const gh      = editForm.elements.githubUrl.value.trim();
-    if (gh) t.githubUrl = gh; else delete t.githubUrl;
-    if (/^#[0-9a-fA-F]{6}$/.test(editForm.elements.accent.value)) {
-      t.accent = editForm.elements.accent.value.toUpperCase();
-    }
-    t.thumbLabel = editForm.elements.thumbLabel.value.trim() || t.thumbLabel;
+    t.url         = url || "#";
+    if (githubUrl) t.githubUrl = githubUrl; else delete t.githubUrl;
+    if (accent) t.accent = accent.toUpperCase();
+    t.thumbLabel = thumbLabel || t.thumbLabel;
+
     closeModal(editModal);
     persistAndRender();
+  });
+
+  // Hide error when user starts typing again
+  ["title", "url", "githubUrl", "accent"].forEach(name => {
+    editForm.elements[name].addEventListener("input", () => {
+      if (editError.style.display !== "none") editError.style.display = "none";
+    });
   });
 
   // ── Generic modal open/close helpers ─────────────────────────────
@@ -2163,36 +2331,41 @@
     return s.trim();
   }
 
+  function showImportError(msg) {
+    importError.textContent = msg;
+    importError.style.display = "block";
+  }
+  // Clear stale error when the user edits the textarea
+  importJsonInput.addEventListener("input", () => {
+    if (importError.style.display !== "none") importError.style.display = "none";
+  });
+
   importJsonBtn.addEventListener("click", () => {
     importError.style.display = "none";
     const raw = stripFences(importJsonInput.value);
     if (!raw) {
-      importError.textContent = "Paste some JSON first.";
-      importError.style.display = "block";
-      return;
+      return showImportError("Paste some JSON first.");
     }
     let parsed;
     try {
       parsed = JSON.parse(raw);
     } catch (e) {
-      importError.textContent = "Couldn't parse — " + e.message;
-      importError.style.display = "block";
-      return;
+      return showImportError(`Invalid JSON — ${e.message}. Check braces, quotes, and commas.`);
     }
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-      importError.textContent = "Expected a JSON object, got " + (Array.isArray(parsed) ? "an array" : typeof parsed) + ".";
-      importError.style.display = "block";
-      return;
+      return showImportError("Invalid JSON — expected an object, got " + (Array.isArray(parsed) ? "an array" : typeof parsed) + ".");
     }
     if (!parsed.title || !parsed.title.toString().trim()) {
-      importError.textContent = 'Missing required field: "title".';
-      importError.style.display = "block";
-      return;
+      return showImportError('Missing required field: "title".');
     }
     if (!parsed.url || !parsed.url.toString().trim()) {
-      importError.textContent = 'Missing required field: "url".';
-      importError.style.display = "block";
-      return;
+      return showImportError('Missing required field: "url".');
+    }
+    if (!looksLikeHttpUrl(parsed.url.toString().trim())) {
+      return showImportError('"url" must start with http:// or https://');
+    }
+    if (parsed.githubUrl && !looksLikeHttpUrl(parsed.githubUrl.toString().trim())) {
+      return showImportError('"githubUrl" must start with http:// or https://');
     }
     const created = createTemplateFromData(parsed);
     closeModal(importModal);
@@ -2203,16 +2376,41 @@
   mixAxes.addEventListener("change", rebuildMixPrompt);
   mixEmitJson.addEventListener("change", rebuildMixPrompt);
 
+  const mixError = document.getElementById("mixError");
+  function showMixError(msg) {
+    mixError.textContent = msg;
+    mixError.style.display = "block";
+    mixBase.focus();
+  }
+  // Clear stale error as user types in the name field
+  mixBase.addEventListener("input", () => {
+    if (mixError.style.display !== "none") mixError.style.display = "none";
+  });
+  function mixNameOK() {
+    if (mixBase.value.trim()) return true;
+    showMixError("Template name is required.");
+    return false;
+  }
+
   mixCopyBtn.addEventListener("click", async () => {
+    if (!mixNameOK()) return;
     try {
       await navigator.clipboard.writeText(mixPromptEl.value);
       mixCopyFb.classList.add("is-visible");
       setTimeout(() => mixCopyFb.classList.remove("is-visible"), 1800);
     } catch (e) {
-      mixPromptEl.select();
-      document.execCommand("copy");
-      mixCopyFb.classList.add("is-visible");
-      setTimeout(() => mixCopyFb.classList.remove("is-visible"), 1800);
+      // Modern API blocked — fall back to selection-based copy
+      try {
+        mixPromptEl.select();
+        if (!document.execCommand("copy")) throw new Error("execCommand returned false");
+        mixCopyFb.classList.add("is-visible");
+        setTimeout(() => mixCopyFb.classList.remove("is-visible"), 1800);
+      } catch (e2) {
+        toast("Couldn't copy to clipboard", {
+          type: "error",
+          body: "Select the prompt manually and press ⌘C / Ctrl+C.",
+        });
+      }
     }
   });
 
@@ -2234,22 +2432,28 @@
     setTimeout(() => registerName.focus(), 50);
   });
 
+  function showRegisterError(msg, focusField) {
+    registerError.textContent = msg;
+    registerError.style.display = "block";
+    if (focusField) focusField.focus();
+  }
+
   registerBtn.addEventListener("click", () => {
     registerError.style.display = "none";
     const name      = registerName.value.trim();
     const url       = registerUrl.value.trim();
     const githubUrl = registerGithubUrl.value.trim();
     if (!name) {
-      registerError.textContent = "Template name is required.";
-      registerError.style.display = "block";
-      registerName.focus();
-      return;
+      return showRegisterError("Template name is required.", registerName);
     }
     if (!url) {
-      registerError.textContent = "Claude Design URL is required.";
-      registerError.style.display = "block";
-      registerUrl.focus();
-      return;
+      return showRegisterError("Claude Design URL is required.", registerUrl);
+    }
+    if (!looksLikeHttpUrl(url)) {
+      return showRegisterError("Claude Design URL must start with http:// or https://", registerUrl);
+    }
+    if (githubUrl && !looksLikeHttpUrl(githubUrl)) {
+      return showRegisterError("GitHub URL must start with http:// or https://", registerGithubUrl);
     }
     const payload = { title: name, url };
     if (githubUrl) payload.githubUrl = githubUrl;
@@ -2259,15 +2463,27 @@
   });
 
   [registerName, registerUrl, registerGithubUrl].forEach(input => {
+    // Enter submits
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") { e.preventDefault(); registerBtn.click(); }
     });
+    // Hide stale error as soon as the user starts typing
+    input.addEventListener("input", () => {
+      if (registerError.style.display !== "none") registerError.style.display = "none";
+    });
+  });
+
+  // Open Claude → guard: refuse to navigate if name is empty.
+  // (The <a> would navigate by default — preventDefault stops it.)
+  mixOpenBtn.addEventListener("click", (e) => {
+    if (!mixNameOK()) { e.preventDefault(); }
   });
 
   // Open Claude → fallback: if prompt is too long for URL, copy to clipboard
   // so the user can paste once they land on the blank chat. The <a> still
   // navigates naturally — we just add the clipboard side-effect.
   mixOpenBtn.addEventListener("click", async () => {
+    if (!mixBase.value.trim()) return;  // guarded above; bail to avoid clipboard spam
     if (mixOpenBtn.dataset.fallback !== "clipboard") return;
     try {
       await navigator.clipboard.writeText(mixPromptEl.value);
@@ -2280,6 +2496,10 @@
       }, 2400);
     } catch (err) {
       console.warn("Clipboard write failed:", err);
+      toast("Couldn't copy the prompt", {
+        type: "error",
+        body: "Open Claude, then copy/paste it manually from the textarea above.",
+      });
     }
   });
 
