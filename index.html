@@ -1616,6 +1616,69 @@
     return "tpl-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
   }
 
+  // ── GitHub link guard ───────────────────────────────────────────
+  // When a card's "GitHub" menu item is clicked, ping the GitHub REST API
+  // to confirm the repo actually exists. If it returns 404 (or the URL is
+  // malformed), show a toast and DON'T open the broken page. Modifier
+  // clicks (⌘/Ctrl/Shift) skip the guard so power-user shortcuts work.
+  async function openGithubGuarded(url) {
+    const match = url.match(/^https?:\/\/github\.com\/([^/]+)\/([^/?#]+)/i);
+    if (!match) {
+      toast("Not a GitHub repo URL", {
+        type: "error",
+        body: "The link doesn't look like https://github.com/owner/repo.",
+      });
+      return;
+    }
+    const owner = match[1];
+    const repo  = match[2].replace(/\.git$/i, "");
+
+    let pending; // optional "checking…" toast for slow responses
+    const slow = setTimeout(() => {
+      pending = toast("Checking GitHub…", { type: "info", duration: 5000 });
+    }, 600);
+
+    try {
+      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+        headers: { "Accept": "application/vnd.github+json" },
+      });
+      clearTimeout(slow);
+      pending?.classList.add("is-fading");
+      setTimeout(() => pending?.remove(), 220);
+
+      if (res.status === 404) {
+        toast("GitHub repo not found", {
+          type: "error",
+          body: `github.com/${owner}/${repo} doesn't exist or is private. Update the link via Edit metadata.`,
+        });
+        return;
+      }
+      if (res.status === 403) {
+        // Rate-limited or unauth issue — let user through, GitHub will handle
+        console.warn("GitHub API rate-limited; opening anyway.");
+      } else if (!res.ok) {
+        console.warn("GitHub API returned", res.status);
+      }
+    } catch (err) {
+      clearTimeout(slow);
+      pending?.classList.add("is-fading");
+      setTimeout(() => pending?.remove(), 220);
+      // Network failure — open anyway, don't block the user on our flaky check
+      console.warn("GitHub repo check failed:", err);
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  // Delegated click handler for any .js-github-link
+  document.addEventListener("click", (e) => {
+    const link = e.target.closest(".js-github-link");
+    if (!link) return;
+    // Let modifier clicks navigate as usual (open in new tab, save link, etc.)
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    openGithubGuarded(link.href);
+  });
+
   // ── Toast notifications ─────────────────────────────────────────
   // Usage: toast("Saved ✓");
   //        toast("Couldn't save", { type: "error", body: "Quota full" });
@@ -1785,7 +1848,7 @@
               </svg>
             </button>
             <div class="btn-split-menu" role="menu" hidden>
-              <a role="menuitem" class="btn-split-menu-item"
+              <a role="menuitem" class="btn-split-menu-item js-github-link"
                  href="${t.githubUrl}"
                  target="_blank" rel="noopener noreferrer">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
