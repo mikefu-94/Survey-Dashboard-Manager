@@ -1123,6 +1123,14 @@
     Import JSON
   </button>
 
+  <button class="btn-mix" id="btnRegister" type="button" aria-label="Register an existing template by URL">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
+         stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M3 1.5h6a.5 .5 0 0 1 .5 .5v8.5l-3.5-2.5-3.5 2.5V2a.5 .5 0 0 1 .5-.5z"/>
+    </svg>
+    Register Template
+  </button>
+
   <div class="view-toggle" role="group" aria-label="View mode">
     <button class="view-btn" id="btnTile" aria-pressed="false" title="Tile view">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
@@ -1246,6 +1254,44 @@
   </div>
 </div>
 
+<!-- ── Register Template (URL-only) modal ── -->
+<div class="modal-backdrop" id="registerModal" hidden role="dialog" aria-modal="true"
+     aria-labelledby="registerModalTitle">
+  <div class="modal-panel" role="document">
+    <div class="modal-header">
+      <div>
+        <h2 class="modal-title" id="registerModalTitle">Register a template</h2>
+        <p class="modal-subtitle">Add an existing Claude Design project to the dashboard. Use this when the project already lives in Claude Design and you just want a card pointing at it.</p>
+      </div>
+      <button class="modal-close" type="button" data-close-modal aria-label="Close">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
+             stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+          <path d="M3 3l8 8M11 3l-8 8"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-field">
+        <label for="registerName">Template name</label>
+        <input id="registerName" type="text" placeholder="e.g., Q3 Partner NPS Survey" maxlength="120" />
+      </div>
+      <div class="form-field">
+        <label for="registerUrl">Claude Design URL</label>
+        <input id="registerUrl" type="url" placeholder="https://claude.ai/design/p/…" />
+      </div>
+      <div class="form-field">
+        <label for="registerGithubUrl">GitHub Repo URL (optional)</label>
+        <input id="registerGithubUrl" type="url" placeholder="https://github.com/…" />
+      </div>
+      <p id="registerError" style="color:#F87171; font-size:12px; margin-top:8px; display:none; font-family:var(--font-mono);"></p>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn-modal" data-close-modal>Cancel</button>
+      <button type="button" class="btn-modal btn-modal--primary" id="registerBtn">Register</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Mix & Match builder modal ── -->
 <div class="modal-backdrop" id="mixModal" hidden role="dialog" aria-modal="true"
      aria-labelledby="mixModalTitle">
@@ -1321,16 +1367,6 @@
         </div>
       </details>
 
-      <div class="mix-step">
-        <p class="mix-step-label"><span class="mix-step-num">6</span> Once Claude has built it</p>
-        <p class="prompt-badges-hint">Paste the new Claude Design URL below to register it as a template on this dashboard.</p>
-        <div style="display:flex; gap:8px;">
-          <input id="mixRegisterUrl" type="url"
-                 placeholder="https://claude.ai/design/p/…"
-                 style="flex:1;padding:9px 12px;font-size:13px;color:var(--text-1);background:var(--bg);border:1px solid var(--border);border-radius:5px;font-family:'Inter',sans-serif;outline:none;" />
-          <button id="mixRegisterBtn" class="btn-modal" type="button">Register Template</button>
-        </div>
-      </div>
     </div>
     <div class="modal-footer">
       <span class="mix-copy-feedback" id="mixCopyFeedback">Copied to clipboard ✓</span>
@@ -1940,8 +1976,6 @@
   const mixCopyBtn  = document.getElementById("mixCopyBtn");
   const mixOpenBtn  = document.getElementById("mixOpenBtn");
   const mixCopyFb   = document.getElementById("mixCopyFeedback");
-  const mixRegisterUrl = document.getElementById("mixRegisterUrl");
-  const mixRegisterBtn = document.getElementById("mixRegisterBtn");
   const mixEmitJson    = document.getElementById("mixEmitJson");
 
   // Each axis lets the user pick which template to source that element from.
@@ -1968,7 +2002,7 @@
     { id: "qRating",    icon: "✦", label: "Rating scale (1–5)",      text: "Include a 1–5 rating-scale question with labelled endpoints." },
     { id: "qNPS",       icon: "✦", label: "NPS (0–10)",              text: "Include a Net Promoter Score question (0–10 scale with 'Not at all likely' to 'Extremely likely' anchors)." },
     { id: "qLikert",    icon: "✦", label: "Likert scale",            text: "Include a 5-point Likert agreement question (Strongly disagree → Strongly agree)." },
-    { id: "qYesNo",     icon: "✦", label: "Yes / No",                text: "Include a binary Yes/No question." },
+    { id: "qYesNo",     icon: "✦", label: "Yes/no question",         text: "Include a binary Yes/No question." },
   ];
   const activeBadges = new Set();
 
@@ -2176,32 +2210,52 @@
     }
   });
 
-  // Step 6: register a card from the URL the user pastes after Open Claude
-  function flashMixFeedback(message, duration = 2400) {
-    const original = mixCopyFb.textContent;
-    mixCopyFb.textContent = message;
-    mixCopyFb.classList.add("is-visible");
-    setTimeout(() => {
-      mixCopyFb.classList.remove("is-visible");
-      mixCopyFb.textContent = original;
-    }, duration);
-  }
-  mixRegisterBtn.addEventListener("click", () => {
-    const url = mixRegisterUrl.value.trim();
-    if (!url) { mixRegisterUrl.focus(); return; }
-    const name = mixBase.value.trim() || "New survey template";
-    const purpose = mixPurpose.value.trim();
-    const created = createTemplateFromData({
-      title: name,
-      description: purpose || `Generated via Mix & Match (${name}).`,
-      url,
-    });
-    flashMixFeedback(`Added "${created.title}" ✓`);
-    mixRegisterUrl.value = "";
+  // ── Register Template modal (URL-only registration) ─────────────
+  const registerModal = document.getElementById("registerModal");
+  const btnRegister   = document.getElementById("btnRegister");
+  const registerName      = document.getElementById("registerName");
+  const registerUrl       = document.getElementById("registerUrl");
+  const registerGithubUrl = document.getElementById("registerGithubUrl");
+  const registerBtn       = document.getElementById("registerBtn");
+  const registerError     = document.getElementById("registerError");
+
+  btnRegister.addEventListener("click", () => {
+    registerName.value = "";
+    registerUrl.value = "";
+    registerGithubUrl.value = "";
+    registerError.style.display = "none";
+    openModal(registerModal);
+    setTimeout(() => registerName.focus(), 50);
   });
-  // Allow Enter inside the URL input to trigger Register
-  mixRegisterUrl.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { e.preventDefault(); mixRegisterBtn.click(); }
+
+  registerBtn.addEventListener("click", () => {
+    registerError.style.display = "none";
+    const name      = registerName.value.trim();
+    const url       = registerUrl.value.trim();
+    const githubUrl = registerGithubUrl.value.trim();
+    if (!name) {
+      registerError.textContent = "Template name is required.";
+      registerError.style.display = "block";
+      registerName.focus();
+      return;
+    }
+    if (!url) {
+      registerError.textContent = "Claude Design URL is required.";
+      registerError.style.display = "block";
+      registerUrl.focus();
+      return;
+    }
+    const payload = { title: name, url };
+    if (githubUrl) payload.githubUrl = githubUrl;
+    const created = createTemplateFromData(payload);
+    closeModal(registerModal);
+    console.info("Registered:", created.title);
+  });
+
+  [registerName, registerUrl, registerGithubUrl].forEach(input => {
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); registerBtn.click(); }
+    });
   });
 
   // Open Claude → fallback: if prompt is too long for URL, copy to clipboard
