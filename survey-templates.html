@@ -1200,7 +1200,7 @@
   <div class="modal-panel modal-panel--wide" role="document">
     <div class="modal-header">
       <div>
-        <h2 class="modal-title" id="mixModalTitle">Mix &amp; match a new template</h2>
+        <h2 class="modal-title" id="mixModalTitle">New Template</h2>
         <p class="modal-subtitle">Pick elements from existing templates. We'll generate a prompt you can paste into Claude Design to create the hybrid.</p>
       </div>
       <button class="modal-close" type="button" data-close-modal aria-label="Close">
@@ -1218,7 +1218,7 @@
       </div>
 
       <div class="mix-step">
-        <p class="mix-step-label"><span class="mix-step-num">2</span> Mix elements (optional)</p>
+        <p class="mix-step-label"><span class="mix-step-num">2</span> Import Elements (optional)</p>
         <div id="mixAxes"></div>
       </div>
 
@@ -1269,8 +1269,8 @@
       <span class="mix-copy-feedback" id="mixCopyFeedback">Copied to clipboard ✓</span>
       <button type="button" class="btn-modal" data-close-modal>Close</button>
       <button type="button" class="btn-modal" id="mixCopyBtn">Copy prompt</button>
-      <a class="btn-modal btn-modal--primary" id="mixOpenBtn" href="https://claude.ai/new" target="_blank" rel="noopener noreferrer">
-        Open Claude
+      <a class="btn-modal btn-modal--primary" id="mixOpenBtn" href="https://claude.ai/design" target="_blank" rel="noopener noreferrer">
+        Open Claude Design
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none"
              stroke="currentColor" stroke-width="1.2"
              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
@@ -1878,27 +1878,29 @@
 
   // Each axis lets the user pick which template to source that element from.
   const MIX_AXES = [
-    { key: "header",   label: "Header layout & branding" },
+    { key: "header",   label: "Layout & Branding" },
     { key: "form",     label: "Form / survey structure" },
     { key: "palette",  label: "Color palette" },
-    { key: "voice",    label: "Tone & copywriting voice" },
   ];
 
   // Toggleable prompt customizations. Click a badge to add/remove its text.
-  // Grouped loosely: style / structure / integrations / quality.
+  // Style / branding / integrations / question types.
   const PROMPT_BADGES = [
+    // ── Style ──
     { id: "minimal",   icon: "✦", label: "Minimal style",     text: "Keep the design minimal — generous white space, restrained typography, very few colour accents." },
     { id: "bold",      icon: "✦", label: "Bold visuals",      text: "Use bold, eye-catching visuals with strong contrast and large display type." },
-    { id: "mobile",    icon: "✦", label: "Mobile-first",      text: "Optimise mobile-first: sticky CTAs, ≥44px tap targets, single-column layouts at small widths." },
     { id: "dark",      icon: "✦", label: "Dark mode",         text: "Default to a dark theme — deep backgrounds, light text, accent colour for primary actions." },
-    { id: "multipage", icon: "✦", label: "Multi-page flow",   text: "Break the survey into multiple steps with a top-anchored progress indicator." },
-    { id: "singleQ",   icon: "✦", label: "One Q / screen",    text: "Show a single question per screen in a conversational, typeform-style flow." },
-    { id: "gforms",    icon: "✦", label: "Google Forms",      text: "Submit answers to a Google Form via pre-filled URL parameters; include the embed URL placeholder." },
-    { id: "webhook",   icon: "✦", label: "Webhook submit",    text: "POST submissions as JSON to a configurable webhook endpoint." },
-    { id: "analytics", icon: "✦", label: "Analytics events",  text: "Fire dataLayer events on page view, every question answered, and final submit." },
-    { id: "wcag",      icon: "✦", label: "WCAG AA contrast",  text: "All text/background combinations must meet WCAG AA contrast. Add a comment block proving each ratio." },
-    { id: "i18n",      icon: "✦", label: "Multi-language",    text: "Externalise all copy into a strings object so the page can be translated easily." },
     { id: "branding",  icon: "✦", label: "EDB brand strict",  text: "Strictly use the EDB Postgres AI brand: wordmark in header, loop-mark motif, forest-green primary." },
+    // ── Integrations ──
+    // ── Question types ──
+    { id: "qShortText", icon: "✦", label: "Short text answer",       text: "Include a short text input field (single line, ≤120 chars)." },
+    { id: "qLongText",  icon: "✦", label: "Long text / essay",       text: "Include a long-form textarea for open-ended written feedback." },
+    { id: "qMultiple",  icon: "✦", label: "Multiple choice",         text: "Include a multiple-choice question (radio buttons, single-select)." },
+    { id: "qCheckbox",  icon: "✦", label: "Checkboxes",              text: "Include a checkbox question that allows multiple selections." },
+    { id: "qRating",    icon: "✦", label: "Rating scale (1–5)",      text: "Include a 1–5 rating-scale question with labelled endpoints." },
+    { id: "qNPS",       icon: "✦", label: "NPS (0–10)",              text: "Include a Net Promoter Score question (0–10 scale with 'Not at all likely' to 'Extremely likely' anchors)." },
+    { id: "qLikert",    icon: "✦", label: "Likert scale",            text: "Include a 5-point Likert agreement question (Strongly disagree → Strongly agree)." },
+    { id: "qYesNo",     icon: "✦", label: "Yes / No",                text: "Include a binary Yes/No question." },
   ];
   const activeBadges = new Set();
 
@@ -1994,7 +1996,7 @@
     // Update the "Open Claude →" button href to carry the prompt via ?q=
     // If the URL would exceed ~8KB, fall back to a blank chat + clipboard.
     const promptStr = mixPromptEl.value;
-    const claudeBase = "https://claude.ai/new";
+    const claudeBase = "https://claude.ai/design";
     const candidateUrl = `${claudeBase}?q=${encodeURIComponent(promptStr)}`;
     const tooLong = candidateUrl.length > 7500;
     mixOpenBtn.href = tooLong ? claudeBase : candidateUrl;
