@@ -2318,15 +2318,13 @@
   let mixPromptDirty = false;
 
   function refreshOpenClaudeLink() {
-    const promptStr = mixPromptEl.value;
-    const claudeBase = "https://claude.ai/design";
-    const candidateUrl = `${claudeBase}?q=${encodeURIComponent(promptStr)}`;
-    const tooLong = candidateUrl.length > 7500;
-    mixOpenBtn.href = tooLong ? claudeBase : candidateUrl;
-    mixOpenBtn.dataset.fallback = tooLong ? "clipboard" : "";
-    mixOpenBtn.title = tooLong
-      ? "Prompt is long — we'll copy it to your clipboard. Paste it once Claude opens."
-      : "Open Claude with this prompt pre-filled";
+    // claude.ai/design doesn't honor a ?q= query param (it'd just spin
+    // on load trying to parse an unknown param), so we always open the
+    // blank Claude Design home and rely on the click handler to copy the
+    // prompt to clipboard. The user lands ready to ⌘V.
+    mixOpenBtn.href = "https://claude.ai/design";
+    mixOpenBtn.dataset.fallback = "clipboard";
+    mixOpenBtn.title = "Opens Claude Design — your prompt is copied to clipboard so you can paste it.";
   }
 
   function rebuildMixPrompt() {
@@ -2634,7 +2632,7 @@
     try {
       await navigator.clipboard.writeText(mixPromptEl.value);
       const originalText = mixCopyFb.textContent;
-      mixCopyFb.textContent = "Prompt too long — copied. Paste in Claude ✓";
+      mixCopyFb.textContent = "Prompt copied — paste in Claude Design ✓";
       mixCopyFb.classList.add("is-visible");
       setTimeout(() => {
         mixCopyFb.classList.remove("is-visible");
