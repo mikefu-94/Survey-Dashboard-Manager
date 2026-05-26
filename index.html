@@ -1411,7 +1411,8 @@
           <svg class="mix-prompt-icon" width="14" height="14" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
             <path d="M6 0L7.2 4.8 12 6 7.2 7.2 6 12 4.8 7.2 0 6 4.8 4.8z"/>
           </svg>
-          <textarea id="mixPrompt" class="mix-prompt" readonly></textarea>
+          <textarea id="mixPrompt" class="mix-prompt"
+                    aria-label="Generated prompt (editable)"></textarea>
         </div>
       </div>
 
@@ -1535,14 +1536,14 @@
     },
     {
       id:         "seed-cadence-3",
-      title:      "EDB Cadence Survey 3.0",
-      description:"Placeholder template — update this description when the survey is ready. Duplicate from v2.0 and customise via Tweaks.",
+      title:      "Placeholder template",
+      description:"Placeholder card — open the ⋯ menu to Edit metadata once the real survey is ready, or Delete to remove this slot.",
       audience:   "external",
       category:   "Cadence Survey",
       url:        "#",
       accent:     "#22C55E",
       thumbBg:    "#0C1A12",
-      thumbLabel: "v3.0",
+      thumbLabel: "new",
       // Teal-dominant, horizontal left → right
       thumbGradient: {
         x1: "0%", y1: "50%", x2: "100%", y2: "50%",
@@ -1555,14 +1556,14 @@
     },
     {
       id:         "seed-cadence-4",
-      title:      "EDB Cadence Survey 4.0",
-      description:"Placeholder template — update this description when the survey is ready. Duplicate from v2.0 and customise via Tweaks.",
+      title:      "Placeholder template",
+      description:"Placeholder card — open the ⋯ menu to Edit metadata once the real survey is ready, or Delete to remove this slot.",
       audience:   "internal",
       category:   "Cadence Survey",
       url:        "#",
       accent:     "#60A5FA",
       thumbBg:    "#0C1218",
-      thumbLabel: "v4.0",
+      thumbLabel: "new",
       // Blue-to-green, bottom-right → top-left
       thumbGradient: {
         x1: "100%", y1: "100%", x2: "0%", y2: "0%",
@@ -2279,7 +2280,30 @@
     }[c]));
   }
 
+  // True once the user has manually typed into the prompt textarea.
+  // When dirty, the auto-rebuild stops overwriting their edits, but the
+  // Open Claude link still reflects whatever's currently in the textarea.
+  let mixPromptDirty = false;
+
+  function refreshOpenClaudeLink() {
+    const promptStr = mixPromptEl.value;
+    const claudeBase = "https://claude.ai/design";
+    const candidateUrl = `${claudeBase}?q=${encodeURIComponent(promptStr)}`;
+    const tooLong = candidateUrl.length > 7500;
+    mixOpenBtn.href = tooLong ? claudeBase : candidateUrl;
+    mixOpenBtn.dataset.fallback = tooLong ? "clipboard" : "";
+    mixOpenBtn.title = tooLong
+      ? "Prompt is long — we'll copy it to your clipboard. Paste it once Claude opens."
+      : "Open Claude with this prompt pre-filled";
+  }
+
   function rebuildMixPrompt() {
+    // If the user has hand-edited the prompt, leave it alone — just keep
+    // the Open Claude link in sync with whatever they typed.
+    if (mixPromptDirty) {
+      refreshOpenClaudeLink();
+      return;
+    }
     const name = mixBase.value.trim();
     const purpose = mixPurpose.value.trim();
     const overrides = MIX_AXES.map(axis => {
@@ -2333,38 +2357,58 @@
     }
 
     mixPromptEl.value = lines.join("\n");
-
-    // Update the "Open Claude →" button href to carry the prompt via ?q=
-    // If the URL would exceed ~8KB, fall back to a blank chat + clipboard.
-    const promptStr = mixPromptEl.value;
-    const claudeBase = "https://claude.ai/design";
-    const candidateUrl = `${claudeBase}?q=${encodeURIComponent(promptStr)}`;
-    const tooLong = candidateUrl.length > 7500;
-    mixOpenBtn.href = tooLong ? claudeBase : candidateUrl;
-    mixOpenBtn.dataset.fallback = tooLong ? "clipboard" : "";
-    mixOpenBtn.title = tooLong
-      ? "Prompt is long — we'll copy it to your clipboard. Paste it once Claude opens."
-      : "Open Claude with this prompt pre-filled";
+    refreshOpenClaudeLink();
   }
 
-  // Badge click handler — toggle active state + rebuild prompt
-  document.addEventListener("click", (e) => {
-    const badge = e.target.closest(".prompt-badge");
-    if (!badge) return;
-    const id = badge.dataset.badge;
-    if (activeBadges.has(id)) {
-      activeBadges.delete(id);
-      badge.classList.remove("is-active");
-      badge.setAttribute("aria-pressed", "false");
+  // When the prompt textarea is dirty (user-edited), badge clicks
+  // surgically add or remove the matching bullet line in the current
+  // textarea text — preserving the user's edits everywhere else.
+  function applyBadgeToDirtyPrompt(badge, turnOn) {
+    const bulletLine = `  • ${badge.text}`;
+    let text = mixPromptEl.value;
+    if (turnOn) {
+      if (text.includes(bulletLine)) return;             // already present
+      text = text.replace(/\s+$/, "") + "\n" + bulletLine;
     } else {
-      activeBadges.add(id);
-      badge.classList.add("is-active");
-      badge.setAttribute("aria-pressed", "true");
+      const lines = text.split("\n");
+      const idx = lines.indexOf(bulletLine);
+      if (idx === -1) return;                            // nothing to remove
+      lines.splice(idx, 1);
+      text = lines.join("\n")
+        .replace(/\n{3,}/g, "\n\n")                      // collapse blank-line runs
+        .replace(/\s+$/, "");
     }
-    rebuildMixPrompt();
+    mixPromptEl.value = text;
+    refreshOpenClaudeLink();
+  }
+
+  // Badge click handler — toggle active state + reflect in the prompt.
+  // In clean mode, full rebuild. In dirty mode, surgical edit so we don't
+  // blow away the user's manual changes elsewhere in the textarea.
+  document.addEventListener("click", (e) => {
+    const badgeEl = e.target.closest(".prompt-badge");
+    if (!badgeEl) return;
+    const id = badgeEl.dataset.badge;
+    const turningOn = !activeBadges.has(id);
+    if (turningOn) {
+      activeBadges.add(id);
+      badgeEl.classList.add("is-active");
+      badgeEl.setAttribute("aria-pressed", "true");
+    } else {
+      activeBadges.delete(id);
+      badgeEl.classList.remove("is-active");
+      badgeEl.setAttribute("aria-pressed", "false");
+    }
+    if (mixPromptDirty) {
+      const badge = PROMPT_BADGES.find(b => b.id === id);
+      if (badge) applyBadgeToDirtyPrompt(badge, turningOn);
+    } else {
+      rebuildMixPrompt();
+    }
   });
 
   btnMix.addEventListener("click", () => {
+    mixPromptDirty = false;  // fresh open starts auto-regenerating
     populateMixModal();
     openModal(mixModal);
     setTimeout(() => mixPurpose.focus(), 50);
@@ -2438,6 +2482,13 @@
   mixPurpose.addEventListener("input", rebuildMixPrompt);
   mixAxes.addEventListener("change", rebuildMixPrompt);
   mixEmitJson.addEventListener("change", rebuildMixPrompt);
+
+  // User-edits to the prompt textarea: lock auto-rebuild + keep Open
+  // Claude link in sync with what they actually typed.
+  mixPromptEl.addEventListener("input", () => {
+    mixPromptDirty = true;
+    refreshOpenClaudeLink();
+  });
 
   const mixError = document.getElementById("mixError");
   function showMixError(msg) {
