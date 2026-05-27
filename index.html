@@ -860,6 +860,22 @@
     }
     .btn-modal--primary:hover { background: var(--accent); opacity: 0.88; }
 
+    /* Destructive variant for "Discard / Delete" confirmations */
+    .btn-modal--destructive {
+      background: #F87171;
+      border-color: #F87171;
+      color: #0A0A0A;
+    }
+    .btn-modal--destructive:hover { background: #F87171; opacity: 0.88; }
+
+    /* Compact confirm-dialog body */
+    .confirm-message {
+      font-size: 13px;
+      line-height: 1.55;
+      color: var(--text-2);
+      margin: 0;
+    }
+
     /* ── Toolbar 'New from mix' button ── */
     .btn-mix {
       display: inline-flex;
@@ -1347,6 +1363,25 @@
     <div class="modal-footer">
       <button type="button" class="btn-modal" data-close-modal>Cancel</button>
       <button type="button" class="btn-modal btn-modal--primary" id="registerBtn">Register</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Confirm dialog (custom-styled, replaces native confirm()) ── -->
+<div class="modal-backdrop" id="confirmModal" hidden role="alertdialog" aria-modal="true"
+     aria-labelledby="confirmTitle" aria-describedby="confirmMessage" style="z-index: 110;">
+  <div class="modal-panel" role="document" style="max-width: 420px;">
+    <div class="modal-header">
+      <div>
+        <h2 class="modal-title" id="confirmTitle">Confirm</h2>
+      </div>
+    </div>
+    <div class="modal-body">
+      <p class="confirm-message" id="confirmMessage"></p>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn-modal" id="confirmCancelBtn">Cancel</button>
+      <button type="button" class="btn-modal btn-modal--primary" id="confirmAcceptBtn">OK</button>
     </div>
   </div>
 </div>
@@ -2231,33 +2266,97 @@
     return false;
   }
 
-  function closeModal(modal) {
-    // Guard: New Template modal warns if the user has unsaved input.
-    // Nothing in this modal persists — closing always discards. Make
-    // sure they realise that before tossing their work.
-    if (modal && modal.id === "mixModal" && hasUnsavedMixData()) {
-      const ok = confirm(
-        "You have unsaved changes in this New Template draft.\n\n" +
-        "Closing this modal will discard everything you've entered — there's no autosave. Close anyway?"
-      );
-      if (!ok) return;
-    }
+  // Low-level close — bypasses any guards. Use closeModal() everywhere
+  // else; only call this directly when the guard has already been
+  // satisfied (e.g. user clicked "Discard" in the confirm dialog).
+  function doCloseModal(modal) {
     modal.hidden = true;
-    document.body.style.overflow = "";
+    // Only reset body overflow if no other modal remains open
+    const anyStillOpen = [...document.querySelectorAll(".modal-backdrop")]
+      .some(m => !m.hidden);
+    if (!anyStillOpen) document.body.style.overflow = "";
   }
 
-  // Click on backdrop or [data-close-modal] closes its modal
+  function closeModal(modal) {
+    // Guard: New Template modal warns if the user has unsaved input.
+    // Nothing in this modal persists — closing always discards.
+    if (modal && modal.id === "mixModal" && hasUnsavedMixData()) {
+      openConfirm({
+        title: "Discard New Template draft?",
+        message: "Closing will erase everything you've entered — there's no autosave. This can't be undone.",
+        confirmLabel: "Discard",
+        cancelLabel: "Keep editing",
+        destructive: true,
+        onAccept: () => doCloseModal(mixModal),
+      });
+      return;
+    }
+    doCloseModal(modal);
+  }
+
+  // ── Custom confirm dialog (replaces native confirm()) ────────────
+  const confirmModal     = document.getElementById("confirmModal");
+  const confirmTitle     = document.getElementById("confirmTitle");
+  const confirmMessage   = document.getElementById("confirmMessage");
+  const confirmAcceptBtn = document.getElementById("confirmAcceptBtn");
+  const confirmCancelBtn = document.getElementById("confirmCancelBtn");
+
+  function openConfirm({ title, message, confirmLabel = "OK", cancelLabel = "Cancel", destructive = false, onAccept, onCancel }) {
+    confirmTitle.textContent = title;
+    confirmMessage.textContent = message;
+    confirmAcceptBtn.textContent = confirmLabel;
+    confirmCancelBtn.textContent = cancelLabel;
+    confirmAcceptBtn.classList.toggle("btn-modal--destructive", !!destructive);
+    confirmAcceptBtn.classList.toggle("btn-modal--primary", !destructive);
+
+    // Bind one-shot handlers
+    const handleAccept = () => {
+      cleanup();
+      doCloseModal(confirmModal);
+      onAccept?.();
+    };
+    const handleCancel = () => {
+      cleanup();
+      doCloseModal(confirmModal);
+      onCancel?.();
+    };
+    function cleanup() {
+      confirmAcceptBtn.removeEventListener("click", handleAccept);
+      confirmCancelBtn.removeEventListener("click", handleCancel);
+    }
+    confirmAcceptBtn.addEventListener("click", handleAccept);
+    confirmCancelBtn.addEventListener("click", handleCancel);
+
+    openModal(confirmModal);
+    setTimeout(() => confirmCancelBtn.focus(), 50);  // safer default focus
+  }
+
+  // Click on backdrop or [data-close-modal] closes its modal.
+  // Exception: confirm-dialog backdrop click is ignored — too easy to
+  // dismiss accidentally. User must click Cancel explicitly.
   document.addEventListener("click", (e) => {
-    if (e.target.matches(".modal-backdrop")) closeModal(e.target);
+    if (e.target.matches(".modal-backdrop")) {
+      if (e.target.id !== "confirmModal") closeModal(e.target);
+      return;
+    }
     const closer = e.target.closest("[data-close-modal]");
     if (closer) {
       const modal = closer.closest(".modal-backdrop");
       if (modal) closeModal(modal);
     }
   });
+  // Esc only closes the top-most open modal (so dismissing the confirm
+  // dialog doesn't also auto-close the modal underneath it).
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      document.querySelectorAll(".modal-backdrop:not([hidden])").forEach(closeModal);
+    if (e.key !== "Escape") return;
+    const openModals = [...document.querySelectorAll(".modal-backdrop:not([hidden])")];
+    if (openModals.length === 0) return;
+    const top = openModals[openModals.length - 1];  // last-opened wins
+    // For the confirm dialog, Esc means Cancel
+    if (top.id === "confirmModal") {
+      confirmCancelBtn.click();
+    } else {
+      closeModal(top);
     }
   });
 
