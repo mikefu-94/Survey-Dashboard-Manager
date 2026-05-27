@@ -2216,7 +2216,32 @@
     modal.hidden = false;
     document.body.style.overflow = "hidden";
   }
+
+  // Has the user typed/picked anything in the New Template modal?
+  // Used to decide whether to confirm before closing.
+  function hasUnsavedMixData() {
+    if (mixBase.value.trim()) return true;
+    if (mixPurpose.value.trim()) return true;
+    if (activeBadges.size > 0) return true;
+    if (mixEmitJson?.checked) return true;
+    if (mixPromptDirty) return true;
+    for (const sel of mixAxes.querySelectorAll("select")) {
+      if (sel.value) return true;
+    }
+    return false;
+  }
+
   function closeModal(modal) {
+    // Guard: New Template modal warns if the user has unsaved input.
+    // Nothing in this modal persists — closing always discards. Make
+    // sure they realise that before tossing their work.
+    if (modal && modal.id === "mixModal" && hasUnsavedMixData()) {
+      const ok = confirm(
+        "You have unsaved changes in this New Template draft.\n\n" +
+        "Closing this modal will discard everything you've entered — there's no autosave. Close anyway?"
+      );
+      if (!ok) return;
+    }
     modal.hidden = true;
     document.body.style.overflow = "";
   }
@@ -2438,10 +2463,19 @@
   });
 
   btnMix.addEventListener("click", () => {
-    mixPromptDirty = false;  // fresh open starts auto-regenerating
-    populateMixModal();
+    // Fresh open: wipe every input so the modal never retains state
+    // between sessions. Nothing in here persists.
+    mixBase.value     = "";
+    mixPurpose.value  = "";
+    activeBadges.clear();
+    if (mixEmitJson) mixEmitJson.checked = false;
+    if (mixError)    mixError.style.display = "none";
+    mixPromptDirty   = false;
+    document.querySelector(".mix-advanced")?.removeAttribute("open");
+
+    populateMixModal();   // re-renders badges + axes in their fresh state
     openModal(mixModal);
-    setTimeout(() => mixPurpose.focus(), 50);
+    setTimeout(() => mixBase.focus(), 50);  // first field that needs filling
   });
 
   // ── Import JSON modal ────────────────────────────────────────────
