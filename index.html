@@ -1165,16 +1165,6 @@
     New Template
   </button>
 
-  <button class="btn-mix" id="btnImport" type="button" aria-label="Import a template from a JSON block emitted by Claude">
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
-         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M6 1.5v7"/>
-      <polyline points="3 5.5 6 8.5 9 5.5"/>
-      <path d="M2 10.5h8"/>
-    </svg>
-    Import JSON
-  </button>
-
   <button class="btn-mix" id="btnRegister" type="button" aria-label="Register an existing template by URL">
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
          stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1301,34 +1291,6 @@
   </div>
 </div>
 
-<!-- ── Import JSON modal ── -->
-<div class="modal-backdrop" id="importModal" hidden role="dialog" aria-modal="true"
-     aria-labelledby="importModalTitle">
-  <div class="modal-panel" role="document">
-    <div class="modal-header">
-      <div>
-        <h2 class="modal-title" id="importModalTitle">Import template JSON</h2>
-        <p class="modal-subtitle">Paste the JSON block Claude emitted at the end of its response. Backticks / <code>```json</code> fences are fine — we strip them automatically.</p>
-      </div>
-      <button class="modal-close" type="button" data-close-modal aria-label="Close">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
-             stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
-          <path d="M3 3l8 8M11 3l-8 8"/>
-        </svg>
-      </button>
-    </div>
-    <div class="modal-body">
-      <textarea id="importJsonInput" class="mix-prompt" style="padding-left:14px;min-height:200px;"
-                placeholder='{"title":"…", "url":"https://claude.ai/design/p/…", "audience":"external", "accent":"#22C55E"}'></textarea>
-      <p id="importError" style="color:#F87171; font-size:12px; margin-top:10px; display:none; font-family:var(--font-mono);"></p>
-    </div>
-    <div class="modal-footer">
-      <button type="button" class="btn-modal" data-close-modal>Cancel</button>
-      <button type="button" class="btn-modal btn-modal--primary" id="importJsonBtn">Import</button>
-    </div>
-  </div>
-</div>
-
 <!-- ── Register Template (URL-only) modal ── -->
 <div class="modal-backdrop" id="registerModal" hidden role="dialog" aria-modal="true"
      aria-labelledby="registerModalTitle">
@@ -1359,6 +1321,19 @@
         <input id="registerGithubUrl" type="url" placeholder="https://github.com/…" />
       </div>
       <p id="registerError" style="color:#F87171; font-size:12px; margin-top:8px; display:none; font-family:var(--font-mono);"></p>
+
+      <details class="mix-advanced" style="margin-top:16px;">
+        <summary>Or import from a JSON block</summary>
+        <div class="mix-advanced-body">
+          <p class="prompt-badges-hint" style="margin-bottom:10px;">For templates Claude built for you — paste the JSON block here (backticks / <code>```json</code> fences are stripped automatically). Bypasses the fields above.</p>
+          <textarea id="importJsonInput" class="mix-prompt" style="padding-left:14px;min-height:140px;font-size:11px;"
+                    placeholder='{"title":"…", "url":"https://claude.ai/design/p/…", "audience":"external", "accent":"#22C55E"}'></textarea>
+          <p id="importError" style="color:#F87171; font-size:12px; margin-top:8px; display:none; font-family:var(--font-mono);"></p>
+          <div style="margin-top:10px; display:flex; justify-content:flex-end;">
+            <button type="button" class="btn-modal" id="importJsonBtn">Import JSON</button>
+          </div>
+        </div>
+      </details>
     </div>
     <div class="modal-footer">
       <button type="button" class="btn-modal" data-close-modal>Cancel</button>
@@ -1463,17 +1438,7 @@
     <div class="modal-footer">
       <span class="mix-copy-feedback" id="mixCopyFeedback">Copied to clipboard ✓</span>
       <button type="button" class="btn-modal" data-close-modal>Close</button>
-      <button type="button" class="btn-modal" id="mixCopyBtn">Copy prompt</button>
-      <a class="btn-modal btn-modal--primary" id="mixOpenBtn" href="https://claude.ai/design" target="_blank" rel="noopener noreferrer">
-        Open Claude Design
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"
-             stroke="currentColor" stroke-width="1.2"
-             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
-             style="margin-left:4px">
-          <path d="M3 7L7 3"/>
-          <polyline points="3.5 3 7 3 7 6.5"/>
-        </svg>
-      </a>
+      <button type="button" class="btn-modal btn-modal--primary" id="mixCopyBtn">Copy prompt</button>
     </div>
   </div>
 </div>
@@ -2368,7 +2333,6 @@
   const mixPurpose  = document.getElementById("mixPurpose");
   const mixPromptEl = document.getElementById("mixPrompt");
   const mixCopyBtn  = document.getElementById("mixCopyBtn");
-  const mixOpenBtn  = document.getElementById("mixOpenBtn");
   const mixCopyFb   = document.getElementById("mixCopyFeedback");
   const mixEmitJson    = document.getElementById("mixEmitJson");
 
@@ -2437,27 +2401,12 @@
   }
 
   // True once the user has manually typed into the prompt textarea.
-  // When dirty, the auto-rebuild stops overwriting their edits, but the
-  // Open Claude link still reflects whatever's currently in the textarea.
+  // When dirty, auto-rebuild stops overwriting the user's edits.
   let mixPromptDirty = false;
 
-  function refreshOpenClaudeLink() {
-    // claude.ai/design doesn't honor a ?q= query param (it'd just spin
-    // on load trying to parse an unknown param), so we always open the
-    // blank Claude Design home and rely on the click handler to copy the
-    // prompt to clipboard. The user lands ready to ⌘V.
-    mixOpenBtn.href = "https://claude.ai/design";
-    mixOpenBtn.dataset.fallback = "clipboard";
-    mixOpenBtn.title = "Opens Claude Design — your prompt is copied to clipboard so you can paste it.";
-  }
-
   function rebuildMixPrompt() {
-    // If the user has hand-edited the prompt, leave it alone — just keep
-    // the Open Claude link in sync with whatever they typed.
-    if (mixPromptDirty) {
-      refreshOpenClaudeLink();
-      return;
-    }
+    // If the user has hand-edited the prompt, leave it alone.
+    if (mixPromptDirty) return;
     const name = mixBase.value.trim();
     const purpose = mixPurpose.value.trim();
     const overrides = MIX_AXES.map(axis => {
@@ -2511,7 +2460,6 @@
     }
 
     mixPromptEl.value = lines.join("\n");
-    refreshOpenClaudeLink();
   }
 
   // When the prompt textarea is dirty (user-edited), badge clicks
@@ -2533,7 +2481,6 @@
         .replace(/\s+$/, "");
     }
     mixPromptEl.value = text;
-    refreshOpenClaudeLink();
   }
 
   // Badge click handler — toggle active state + reflect in the prompt.
@@ -2577,19 +2524,10 @@
     setTimeout(() => mixBase.focus(), 50);  // first field that needs filling
   });
 
-  // ── Import JSON modal ────────────────────────────────────────────
-  const importModal     = document.getElementById("importModal");
+  // ── Import JSON (nested inside the Register Template modal) ───────
   const importJsonInput = document.getElementById("importJsonInput");
   const importJsonBtn   = document.getElementById("importJsonBtn");
   const importError     = document.getElementById("importError");
-  const btnImport       = document.getElementById("btnImport");
-
-  btnImport.addEventListener("click", () => {
-    importJsonInput.value = "";
-    importError.style.display = "none";
-    openModal(importModal);
-    setTimeout(() => importJsonInput.focus(), 50);
-  });
 
   // Strip ```json … ``` (or plain ``` …) fences if present, leaving raw JSON.
   function stripFences(s) {
@@ -2638,19 +2576,17 @@
       return showImportError('"githubUrl" must start with http:// or https://');
     }
     const created = createTemplateFromData(parsed);
-    closeModal(importModal);
-    console.info("Imported template:", created.title);
+    doCloseModal(registerModal);  // Import lives inside Register modal now
+    toast(`Imported "${created.title}"`, { type: "success" });
   });
   mixBase.addEventListener("input", rebuildMixPrompt);
   mixPurpose.addEventListener("input", rebuildMixPrompt);
   mixAxes.addEventListener("change", rebuildMixPrompt);
   mixEmitJson.addEventListener("change", rebuildMixPrompt);
 
-  // User-edits to the prompt textarea: lock auto-rebuild + keep Open
-  // Claude link in sync with what they actually typed.
+  // User-edits to the prompt textarea: lock auto-rebuild.
   mixPromptEl.addEventListener("input", () => {
     mixPromptDirty = true;
-    refreshOpenClaudeLink();
   });
 
   const mixError = document.getElementById("mixError");
@@ -2705,6 +2641,10 @@
     registerUrl.value = "";
     registerGithubUrl.value = "";
     registerError.style.display = "none";
+    // Reset the nested Import-JSON section too
+    if (importJsonInput) importJsonInput.value = "";
+    if (importError)     importError.style.display = "none";
+    registerModal.querySelector("details.mix-advanced")?.removeAttribute("open");
     openModal(registerModal);
     setTimeout(() => registerName.focus(), 50);
   });
@@ -2748,36 +2688,6 @@
     input.addEventListener("input", () => {
       if (registerError.style.display !== "none") registerError.style.display = "none";
     });
-  });
-
-  // Open Claude → guard: refuse to navigate if name is empty.
-  // (The <a> would navigate by default — preventDefault stops it.)
-  mixOpenBtn.addEventListener("click", (e) => {
-    if (!mixNameOK()) { e.preventDefault(); }
-  });
-
-  // Open Claude → fallback: if prompt is too long for URL, copy to clipboard
-  // so the user can paste once they land on the blank chat. The <a> still
-  // navigates naturally — we just add the clipboard side-effect.
-  mixOpenBtn.addEventListener("click", async () => {
-    if (!mixBase.value.trim()) return;  // guarded above; bail to avoid clipboard spam
-    if (mixOpenBtn.dataset.fallback !== "clipboard") return;
-    try {
-      await navigator.clipboard.writeText(mixPromptEl.value);
-      const originalText = mixCopyFb.textContent;
-      mixCopyFb.textContent = "Prompt copied — paste in Claude Design ✓";
-      mixCopyFb.classList.add("is-visible");
-      setTimeout(() => {
-        mixCopyFb.classList.remove("is-visible");
-        mixCopyFb.textContent = originalText;
-      }, 2400);
-    } catch (err) {
-      console.warn("Clipboard write failed:", err);
-      toast("Couldn't copy the prompt", {
-        type: "error",
-        body: "Open Claude, then copy/paste it manually from the textarea above.",
-      });
-    }
   });
 
   renderAll();
