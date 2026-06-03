@@ -2110,10 +2110,20 @@
   function confirmAndDelete(id) {
     const t = getById(id);
     if (!t) return;
-    if (!confirm(`Delete "${t.title}"?\n\nThis only removes the card from your dashboard. The underlying Claude Design project and GitHub repo are not touched.`)) return;
-    const i = findIdx(id);
-    TEMPLATES.splice(i, 1);
-    persistAndRender();
+    openConfirm({
+      title: `Delete "${t.title}"?`,
+      message: "This only removes the card from your dashboard. The underlying Claude Design project and GitHub repo aren't touched.",
+      confirmLabel: "Delete",
+      cancelLabel: "Cancel",
+      destructive: true,
+      onAccept: () => {
+        const i = findIdx(id);
+        if (i < 0) return;
+        TEMPLATES.splice(i, 1);
+        persistAndRender();
+        toast(`Deleted "${t.title}"`, { type: "success" });
+      },
+    });
   }
 
   // ── Edit metadata modal ─────────────────────────────────────────
