@@ -256,6 +256,13 @@
       font-size: 9px;
       padding: 1px 6px;
     }
+    /* In list view the thumbnail is only 120px wide, so the ellipsis
+       menu's default right:0 would extend off the left edge. Flip it
+       to open rightward into the card body where there's room. */
+    .grid.list-view .card-ellipsis-menu {
+      left: 0;
+      right: auto;
+    }
     .grid.list-view .card-body {
       flex-direction: row;
       align-items: center;
@@ -316,7 +323,9 @@
       gap: 12px;
       flex-shrink: 0;
       position: relative;
-      overflow: hidden;
+      /* No overflow:hidden — the ellipsis menu needs to extend past
+         the thumbnail edges when opened. The background still honors
+         border-radius natively, so the rounded corners stay intact. */
       border-radius: var(--radius) var(--radius) 0 0;
     }
     .card-thumb-logo {
@@ -569,6 +578,7 @@
       top: calc(100% + 6px);
       right: 0;
       min-width: 200px;
+      max-width: calc(100vw - 32px);
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 6px;
