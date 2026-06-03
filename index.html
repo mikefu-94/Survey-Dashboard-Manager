@@ -1415,7 +1415,7 @@
         <div class="mix-prompt-wrap">
           <textarea id="mixPrompt" class="mix-prompt"
                     aria-label="Generated prompt (editable)"
-                    placeholder="Edit this directly, or let the fields above generate it for you…"></textarea>
+                    placeholder="Help me design a new survey template."></textarea>
         </div>
       </div>
 
@@ -2416,6 +2416,15 @@
       const source = getById(sourceId);
       return source ? { axis, source } : null;
     }).filter(Boolean);
+    const badgeAdds = PROMPT_BADGES.filter(b => activeBadges.has(b.id));
+    const wantsJsonTail = mixEmitJson && mixEmitJson.checked;
+
+    // Nothing filled yet → leave value empty so the (lighter) placeholder
+    // shows as a hint. The moment any input is provided, populate for real.
+    if (!name && !purpose && overrides.length === 0 && badgeAdds.length === 0 && !wantsJsonTail) {
+      mixPromptEl.value = "";
+      return;
+    }
 
     const lines = [];
     if (name) {
@@ -2435,7 +2444,6 @@
       lines.push(`Purpose: ${purpose}`);
     }
 
-    const badgeAdds = PROMPT_BADGES.filter(b => activeBadges.has(b.id));
     if (badgeAdds.length > 0) {
       lines.push("");
       badgeAdds.forEach(b => lines.push(`  • ${b.text}`));
