@@ -2426,31 +2426,33 @@
     }
 
     const lines = [];
+    // Opener line is only included when the user actually names the
+    // template. Without a name, the "Help me design a new survey
+    // template." sentence is just visual hint text — let it disappear
+    // the moment any pill / axis / purpose is added.
     if (name) {
       lines.push(`Help me design a new survey template called "${name}".`);
-    } else {
-      lines.push("Help me design a new survey template.");
     }
 
     if (overrides.length > 0) {
-      lines.push("");
+      if (lines.length) lines.push("");
       overrides.forEach(({ axis, source }) => {
         lines.push(`  • ${axis.label} → "${source.title}"`);
       });
     }
     if (purpose) {
-      lines.push("");
+      if (lines.length) lines.push("");
       lines.push(`Purpose: ${purpose}`);
     }
 
     if (badgeAdds.length > 0) {
-      lines.push("");
+      if (lines.length) lines.push("");
       badgeAdds.forEach(b => lines.push(`  • ${b.text}`));
     }
 
     // Tail (optional): ask Claude to emit a JSON block for the Import JSON path
     if (mixEmitJson && mixEmitJson.checked) {
-      lines.push("");
+      if (lines.length) lines.push("");
       lines.push("When you're done, output a single fenced JSON block in this exact shape so I can paste it back into my dashboard:");
       lines.push("```json");
       lines.push("{");
